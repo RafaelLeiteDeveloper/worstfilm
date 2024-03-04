@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 @SpringBootTest(classes = ApiApplication.class)
 @Transactional
 public class MovieServiceIntegrationTest {
@@ -24,8 +26,15 @@ public class MovieServiceIntegrationTest {
 
         ProducerData producerResourceFromDataBase = filmService.getWinningProducersMinMaxIntervalRange();
 
-        Assertions.assertThat(producerResourceFromDataBase.getMin().get(0).getProducer()).isEqualTo(dtoMin.getProducer());
-        Assertions.assertThat(producerResourceFromDataBase.getMax().get(0).getProducer()).isEqualTo(dtoMax.getProducer());
+        assertEquals(producerResourceFromDataBase.getMin().get(0).getProducer(), dtoMin.getProducer());
+        assertEquals(producerResourceFromDataBase.getMin().get(0).getInterval(), dtoMin.getInterval());
+        assertEquals(producerResourceFromDataBase.getMin().get(0).getPreviousWin(), dtoMin.getPreviousWin());
+        assertEquals(producerResourceFromDataBase.getMin().get(0).getFollowingWin(), dtoMin.getFollowingWin());
+
+        assertEquals(producerResourceFromDataBase.getMax().get(0).getProducer(), dtoMax.getProducer());
+        assertEquals(producerResourceFromDataBase.getMax().get(0).getInterval(), dtoMax.getInterval());
+        assertEquals(producerResourceFromDataBase.getMax().get(0).getPreviousWin(), dtoMax.getPreviousWin());
+        assertEquals(producerResourceFromDataBase.getMax().get(0).getFollowingWin(), dtoMax.getFollowingWin());
     }
 
 }
