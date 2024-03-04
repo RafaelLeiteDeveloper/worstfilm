@@ -44,24 +44,38 @@ public class MovieProcessorImpl implements MovieProcessor {
     public void calculateMaxDistanceForProducer(List<Integer> years, ProducersYearsDTO producer) {
         years.sort(Integer::compareTo);
 
-        Integer[] maxDistance = {0};
-        Integer[] startYear = {0};
-        Integer[] endYear = {0};
+        Integer minDistance = Integer.MAX_VALUE; // Inicializa com o maior valor possível
+        Integer maxDistance = Integer.MIN_VALUE; // Inicializa com o menor valor possível
+        Integer minStartYear = 0;
+        Integer minEndYear = 0;
+        Integer maxStartYear = 0;
+        Integer maxEndYear = 0;
 
-        years.stream()
-                .reduce((prevYear, currYear) -> {
-                    int distance = currYear - prevYear;
-                    if (distance > maxDistance[0]) {
-                        maxDistance[0] = distance;
-                        startYear[0] = prevYear;
-                        endYear[0] = currYear;
-                    }
-                    return currYear;
-                });
+        for (int i = 1; i < years.size(); i++) {
+            int prevYear = years.get(i - 1);
+            int currYear = years.get(i);
+            int distance = currYear - prevYear;
 
-        producer.setInterval(maxDistance[0]);
-        producer.setPreviousWin(startYear[0]);
-        producer.setFollowingWin(endYear[0]);
+            if (distance < minDistance) {
+                minDistance = distance;
+                minStartYear = prevYear;
+                minEndYear = currYear;
+            }
+
+            if (distance > maxDistance) {
+                maxDistance = distance;
+                maxStartYear = prevYear;
+                maxEndYear = currYear;
+            }
+        }
+
+        producer.setIntervalMax(maxDistance);
+        producer.setPreviousWinMax(maxStartYear);
+        producer.setFollowingWinMax(maxEndYear);
+
+        producer.setIntervalMin(minDistance);
+        producer.setPreviousWinMin(minStartYear);
+        producer.setFollowingWinMin(minEndYear);
     }
 
 
@@ -81,7 +95,7 @@ public class MovieProcessorImpl implements MovieProcessor {
 
     public  List<ProducersYearsDTO> createProducersYearsDTOList(Map<String, List<Integer>> producersMap) {
         List<ProducersYearsDTO> updatedFilms = new ArrayList<>();
-        producersMap.forEach((producer, years) -> updatedFilms.add(new ProducersYearsDTO(producer, years, 0, 0, 0)));
+        producersMap.forEach((producer, years) -> updatedFilms.add(new ProducersYearsDTO(producer, years, 0, 0, 0, 0, 0, 0)));
 
         return updatedFilms;
     }
@@ -92,10 +106,10 @@ public class MovieProcessorImpl implements MovieProcessor {
 
         return new ProducerData(
                 minDistanceDTOS.stream()
-                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getInterval(), producer.getPreviousWin(), producer.getFollowingWin()))
+                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getIntervalMin(), producer.getPreviousWinMin(), producer.getFollowingWinMin()))
                         .collect(Collectors.toList()),
                 maxDistanceDTOS.stream()
-                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getInterval(), producer.getPreviousWin(), producer.getFollowingWin()))
+                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getIntervalMax(), producer.getPreviousWinMax(), producer.getFollowingWinMax()))
                         .collect(Collectors.toList())
         );
     }
@@ -103,24 +117,24 @@ public class MovieProcessorImpl implements MovieProcessor {
     public List<ProducersYearsDTO> maxProducer(List<ProducersYearsDTO> films){
         Integer maxMaxDistance = films.stream()
                 .filter(film -> film.getYears().size() > 1)
-                .mapToInt(ProducersYearsDTO::getInterval)
+                .mapToInt(ProducersYearsDTO::getIntervalMax)
                 .max()
                 .orElseThrow(null);
 
         return films.stream()
-                .filter(film -> film.getYears().size() > 1 && Objects.equals(film.getInterval(), maxMaxDistance))
+                .filter(film -> film.getYears().size() > 1 && Objects.equals(film.getIntervalMax(), maxMaxDistance))
                 .collect(Collectors.toList());
     }
 
     public List<ProducersYearsDTO> minProducers(List<ProducersYearsDTO> films){
         Integer minMaxDistance = films.stream()
                 .filter(film -> film.getYears().size() > 1)
-                .mapToInt(ProducersYearsDTO::getInterval)
+                .mapToInt(ProducersYearsDTO::getIntervalMin)
                 .min()
                 .orElseThrow(null);
 
         return films.stream()
-                .filter(film -> film.getYears().size() > 1 && Objects.equals(film.getInterval(), minMaxDistance))
+                .filter(film -> film.getYears().size() >= 1 && Objects.equals(film.getIntervalMin(), minMaxDistance))
                 .collect(Collectors.toList());
     }
 }

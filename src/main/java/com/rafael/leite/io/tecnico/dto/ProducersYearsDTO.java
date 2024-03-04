@@ -13,7 +13,12 @@ import java.util.List;
 public class ProducersYearsDTO {
     private String producers;
     private List<Integer> years;
-    private Integer interval;
-    private Integer previousWin;
-    private Integer followingWin;
+
+    private Integer intervalMax;
+    private Integer previousWinMax;
+    private Integer followingWinMax;
+
+    private Integer intervalMin;
+    private Integer previousWinMin;
+    private Integer followingWinMin;
 }
