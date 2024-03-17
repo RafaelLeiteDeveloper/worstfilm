@@ -3,6 +3,7 @@ package com.rafael.leite.io.tecnico.port.application.processor;
 import com.rafael.leite.io.tecnico.domain.Films;
 import com.rafael.leite.io.tecnico.dto.ProducerDTO;
 import com.rafael.leite.io.tecnico.dto.ProducerData;
+import com.rafael.leite.io.tecnico.dto.ProducersIntervalDTO;
 import com.rafael.leite.io.tecnico.dto.ProducersYearsDTO;
 import com.rafael.leite.io.tecnico.port.repository.MovieRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,39 +46,46 @@ public class MovieProcessorImpl implements MovieProcessor {
     public void calculateMaxDistanceForProducer(List<Integer> years, ProducersYearsDTO producer) {
         years.sort(Integer::compareTo);
 
-        Integer[] minDistance = {Integer.MAX_VALUE};
-        Integer[] maxDistance = {Integer.MIN_VALUE};
-        Integer[] minStartYear = {0};
-        Integer[] minEndYear = {0};
-        Integer[] maxStartYear = {0};
-        Integer[] maxEndYear = {0};
+        for (int i = 0; i < years.size() - 1; i++) {
 
-        years.stream()
-                .reduce((prevYear, currYear) -> {
-                    int distance = currYear - prevYear;
+            int currentYear = years.get(i);
+            int nextYear = years.get(i + 1);
+            int interval = nextYear - currentYear;
 
-                    if (distance < minDistance[0]) {
-                        minDistance[0] = distance;
-                        minStartYear[0] = prevYear;
-                        minEndYear[0] = currYear;
-                    }
+            producer.getInterval().add(ProducersIntervalDTO.builder().
+                    interval(interval).
+                    followingWin(nextYear).
+                    previousWin(currentYear).
+                    build());
+        }
 
-                    if (distance > maxDistance[0]) {
-                        maxDistance[0] = distance;
-                        maxStartYear[0] = prevYear;
-                        maxEndYear[0] = currYear;
-                    }
+        producer.setIntervalMax(getMaxInterval(producer.getInterval()));
+        producer.setIntervalMin(getMinInterval(producer.getInterval()));
+    }
 
-                    return currYear;
-                });
 
-        producer.setIntervalMax(maxDistance[0]);
-        producer.setPreviousWinMax(maxStartYear[0]);
-        producer.setFollowingWinMax(maxEndYear[0]);
+    public List<ProducersIntervalDTO> getExtremeInterval(List<ProducersIntervalDTO> producers, Comparator<Integer> comparator) {
+        Optional<Integer> extremeInterval = producers.stream()
+                .map(ProducersIntervalDTO::getInterval)
+                .min(comparator);
 
-        producer.setIntervalMin(minDistance[0]);
-        producer.setPreviousWinMin(minStartYear[0]);
-        producer.setFollowingWinMin(minEndYear[0]);
+        if (extremeInterval.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        final Integer extremeValue = extremeInterval.get();
+
+        return producers.stream()
+                .filter(p -> p.getInterval().equals(extremeValue))
+                .collect(Collectors.toList());
+    }
+
+    public List<ProducersIntervalDTO> getMaxInterval(List<ProducersIntervalDTO> producers) {
+        return getExtremeInterval(producers, Comparator.reverseOrder());
+    }
+
+    public List<ProducersIntervalDTO> getMinInterval(List<ProducersIntervalDTO> producers) {
+        return getExtremeInterval(producers, Comparator.naturalOrder());
     }
 
     public  Map<String, List<Integer>> createProducersMap(List<Films> films) {
@@ -96,46 +104,74 @@ public class MovieProcessorImpl implements MovieProcessor {
 
     public  List<ProducersYearsDTO> createProducersYearsDTOList(Map<String, List<Integer>> producersMap) {
         List<ProducersYearsDTO> updatedFilms = new ArrayList<>();
-        producersMap.forEach((producer, years) -> updatedFilms.add(new ProducersYearsDTO(producer, years, 0, 0, 0, 0, 0, 0)));
+        producersMap.forEach((producer, years) -> updatedFilms.add(new ProducersYearsDTO(producer, years, new ArrayList<>(), new ArrayList<>(),new ArrayList<>())));
 
         return updatedFilms;
     }
 
     public ProducerData printUpdatedFilmsList(List<ProducersYearsDTO> films) {
-        List<ProducersYearsDTO> maxDistanceDTOS = this.maxProducer(films);
-        List<ProducersYearsDTO> minDistanceDTOS = this.minProducers(films);
+        List<ProducerDTO> maxDistanceDTOS = new ArrayList<>();
+        List<ProducerDTO> minDistanceDTOS = new ArrayList<>();;
 
-        return new ProducerData(
-                minDistanceDTOS.stream()
-                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getIntervalMin(), producer.getPreviousWinMin(), producer.getFollowingWinMin()))
-                        .collect(Collectors.toList()),
-                maxDistanceDTOS.stream()
-                        .map(producer -> new ProducerDTO(producer.getProducers(), producer.getIntervalMax(), producer.getPreviousWinMax(), producer.getFollowingWinMax()))
-                        .collect(Collectors.toList())
-        );
+        films.forEach(obj -> {
+            obj.getIntervalMax().forEach(min ->{
+                maxDistanceDTOS.add(ProducerDTO.builder().
+                        producer(obj.getProducers()).
+                        interval(min.getInterval()).
+                        followingWin(min.getFollowingWin()).
+                        previousWin(min.getPreviousWin()).
+                        build());
+            });
+        });
+
+        films.forEach(obj -> {
+            obj.getIntervalMin().forEach(min ->{
+                minDistanceDTOS.add(ProducerDTO.builder().
+                        producer(obj.getProducers()).
+                        interval(min.getInterval()).
+                        followingWin(min.getFollowingWin()).
+                        previousWin(min.getPreviousWin()).
+                        build());
+            });
+        });
+
+        return new ProducerData(getProducersWithMinInterval(minDistanceDTOS),getProducersWithMaxInterval(maxDistanceDTOS));
     }
 
-    public List<ProducersYearsDTO> maxProducer(List<ProducersYearsDTO> films){
-        Integer maxMaxDistance = films.stream()
-                .filter(film -> film.getYears().size() > MIN_INTERVAL)
-                .mapToInt(ProducersYearsDTO::getIntervalMax)
-                .max()
-                .orElseThrow(null);
-
-        return films.stream()
-                .filter(film -> film.getYears().size() > MIN_INTERVAL && Objects.equals(film.getIntervalMax(), maxMaxDistance))
-                .collect(Collectors.toList());
+    public List<ProducerDTO> getProducersWithMinInterval(List<ProducerDTO> producersList) {
+        int minInterval = findMinInterval(producersList);
+        return filterProducersByInterval(producersList, minInterval);
     }
 
-    public List<ProducersYearsDTO> minProducers(List<ProducersYearsDTO> films){
-        Integer minMaxDistance = films.stream()
-                .filter(film -> film.getYears().size() > MIN_INTERVAL)
-                .mapToInt(ProducersYearsDTO::getIntervalMin)
-                .min()
-                .orElseThrow(null);
-
-        return films.stream()
-                .filter(film -> film.getYears().size() > MIN_INTERVAL && Objects.equals(film.getIntervalMin(), minMaxDistance))
-                .collect(Collectors.toList());
+    public List<ProducerDTO> getProducersWithMaxInterval(List<ProducerDTO> producersList) {
+        int maxInterval = findMaxInterval(producersList);
+        return filterProducersByInterval(producersList, maxInterval);
     }
+
+    private int findMinInterval(List<ProducerDTO> producersList) {
+        int min = Integer.MAX_VALUE;
+        for (ProducerDTO producer : producersList) {
+            min = Math.min(min, producer.getInterval());
+        }
+        return min;
+    }
+
+    private int findMaxInterval(List<ProducerDTO> producersList) {
+        int max = Integer.MIN_VALUE;
+        for (ProducerDTO producer : producersList) {
+            max = Math.max(max, producer.getInterval());
+        }
+        return max;
+    }
+
+    private List<ProducerDTO> filterProducersByInterval(List<ProducerDTO> producersList, int interval) {
+        List<ProducerDTO> filteredProducers = new ArrayList<>();
+        for (ProducerDTO producer : producersList) {
+            if (producer.getInterval() == interval) {
+                filteredProducers.add(producer);
+            }
+        }
+        return filteredProducers;
+    }
+
 }
